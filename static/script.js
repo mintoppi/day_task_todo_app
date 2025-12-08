@@ -4,6 +4,8 @@ const addBtn = document.getElementById('add-btn');
 const todoList = document.getElementById('todo-list');
 const weekHeader = document.getElementById('week-header');
 const weekRangeDisplay = document.getElementById('week-range-display');
+const globalHistoryBtn = document.getElementById('global-history-btn');
+const dailyTasksBtn = document.getElementById('daily-tasks-btn');
 
 // 履歴モーダル関連の要素
 const modal = document.getElementById('history-modal');
@@ -84,7 +86,14 @@ function renderWeekHeader(weekDates) {
     weekHeader.appendChild(deleteSpacer);
 }
 
-// ... unchanged ...
+// 週の変更（前週/次週への移動）
+function changeWeek(offset) {
+    currentWeekOffset += offset;
+    fetchRoutines();
+}
+
+// グローバルスコープに公開（HTMLのonclick属性から呼び出せるように）
+window.changeWeek = changeWeek;
 
 // ルーチンリストの描画
 function renderRoutines(routines, weekDates) {
@@ -519,9 +528,9 @@ async function deleteRoutine(id) {
     }
 }
 
+
 // イベントリスナー登録
 // DOM Elements for Daily Modal
-const dailyTasksBtn = document.getElementById('daily-tasks-btn');
 const dailyTasksModal = document.getElementById('daily-tasks-modal');
 const dailyTaskList = document.getElementById('daily-task-list');
 const encourageMsg = document.getElementById('encourage-msg');
