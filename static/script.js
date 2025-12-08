@@ -109,12 +109,13 @@ function renderRoutines(routines, weekDates) {
         const li = document.createElement('li');
         li.className = 'todo-item routine-item';
 
-        // ルーチン名表示 (クリックで編集可能)
+        // ルーチン名表示 (ダブルクリックで編集可能)
         const titleDiv = document.createElement('div');
         titleDiv.className = 'routine-title';
         titleDiv.innerText = routine.title;
-        titleDiv.title = routine.title; // ホバーで全文表示
-        titleDiv.onclick = () => editRoutine(routine.id, routine.title);
+        titleDiv.title = 'ダブルクリックで編集'; // ホバーで編集方法を表示
+        titleDiv.dataset.routineId = routine.id;
+        titleDiv.ondblclick = () => makeEditable(titleDiv, routine.id);
         li.appendChild(titleDiv);
 
         // 週ごとの状態表示 (チェックボックス)
@@ -404,24 +405,77 @@ window.onclick = function (event) {
     }
 }
 
-// ルーチン名編集
-async function editRoutine(id, currentTitle) {
-    const newTitle = prompt("Edit Routine Name:", currentTitle);
-    if (!newTitle || newTitle === currentTitle) return;
+// ルーチン名をインライン編集可能にする
+function makeEditable(element, routineId) {
+    const originalText = element.innerText;
 
-    try {
-        const response = await fetch(`/api/routines/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: newTitle })
-        });
+    // contenteditable を有効化
+    element.contentEditable = true;
+    element.focus();
 
-        if (response.ok) {
-            fetchRoutines();
+    // テキストを全選択
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    // スタイルを編集中に変更
+    element.style.background = 'rgba(59, 130, 246, 0.2)';
+    element.style.outline = '2px solid var(--primary-color)';
+    element.style.borderRadius = '4px';
+    element.style.padding = '0.25rem 0.5rem';
+
+    // 保存処理
+    const save = async () => {
+        const newTitle = element.innerText.trim();
+
+        // スタイルをリセット
+        element.contentEditable = false;
+        element.style.background = '';
+        element.style.outline = '';
+        element.style.padding = '';
+
+        if (!newTitle || newTitle === originalText) {
+            element.innerText = originalText;
+            return;
         }
-    } catch (error) {
-        console.error('Error updating routine:', error);
-    }
+
+        try {
+            const response = await fetch(`/api/routines/${routineId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: newTitle })
+            });
+
+            if (response.ok) {
+                element.title = 'ダブルクリックで編集';
+                fetchRoutines();
+            } else {
+                element.innerText = originalText;
+            }
+        } catch (error) {
+            console.error('Error updating routine:', error);
+            element.innerText = originalText;
+        }
+    };
+
+    // Enter で保存
+    element.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            save();
+        } else if (e.key === 'Escape') {
+            element.contentEditable = false;
+            element.innerText = originalText;
+            element.style.background = '';
+            element.style.outline = '';
+            element.style.padding = '';
+        }
+    };
+
+    // フォーカスが外れたら保存
+    element.onblur = save;
 }
 
 // --- 新規ルーチン追加モーダル関連 ---
