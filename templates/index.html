@@ -157,6 +157,42 @@
         </div>
     </div>
 
+    <!-- サブタスク管理モーダル -->
+    <div id="subtask-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Manage Subtasks: <span id="subtask-parent-title"></span></h2>
+                <button class="close-btn" onclick="closeSubtaskModal()">
+                    <ion-icon name="close-outline"></ion-icon>
+                </button>
+            </div>
+
+            <input type="text" id="subtask-input" placeholder="Add subtask..." class="modal-input" autocomplete="off">
+
+            <ul id="subtask-list" class="subtask-list">
+                <!-- Subtasks will be inserted here -->
+            </ul>
+        </div>
+    </div>
+
+    <!-- サブタスク実績入力モーダル -->
+    <div id="subtask-completion-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Complete Subtasks</h2>
+                <button class="close-btn" onclick="closeSubtaskCompletionModal()">
+                    <ion-icon name="close-outline"></ion-icon>
+                </button>
+            </div>
+
+            <p id="subtask-date-display" style="text-align: center; color: var(--text-muted); margin-bottom: 1rem;"></p>
+
+            <ul id="subtask-completion-list" class="subtask-completion-list">
+                <!-- Subtasks for completion will be inserted here -->
+            </ul>
+        </div>
+    </div>
+
     <!-- Daily Tasks Modal -->
     <div id="daily-tasks-modal" class="modal">
         <div class="modal-content card-modal">

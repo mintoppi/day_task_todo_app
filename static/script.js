@@ -14,12 +14,23 @@ const calendarGrid = document.getElementById('calendar-grid');
 const calendarMonthTitle = document.getElementById('calendar-month-title');
 const historyList = document.getElementById('history-list');
 
+// サブタスクモーダル関連の要素
+const subtaskModal = document.getElementById('subtask-modal');
+const subtaskParentTitle = document.getElementById('subtask-parent-title');
+const subtaskInput = document.getElementById('subtask-input');
+const subtaskList = document.getElementById('subtask-list');
+const subtaskCompletionModal = document.getElementById('subtask-completion-modal');
+const subtaskDateDisplay = document.getElementById('subtask-date-display');
+const subtaskCompletionList = document.getElementById('subtask-completion-list');
+
 // 状態管理変数
 let currentRoutineId = null;
 let currentViewDate = new Date(); // カレンダーで表示中の月
 let cachedHistoryData = null; // 取得した履歴データのキャッシュ
 let currentWeekOffset = 0; // 週オフセット (0 = 今週)
 let globalRoutines = []; // 追加: 全ルーチンのキャッシュ
+let currentSubtaskRoutineId = null; // サブタスク管理中のルーチンID
+let currentSubtaskDate = null; // サブタスク実績入力中の日付
 
 // ルーチン一覧の取得と表示
 async function fetchRoutines() {
@@ -109,13 +120,17 @@ function renderRoutines(routines, weekDates) {
         const li = document.createElement('li');
         li.className = 'todo-item routine-item';
 
-        // ルーチン名表示 (ダブルクリックで編集可能)
+        // ルーチン名表示 (シングルクリック: サブタスク管理、ダブルクリック: タイトル編集)
         const titleDiv = document.createElement('div');
         titleDiv.className = 'routine-title';
         titleDiv.innerText = routine.title;
-        titleDiv.title = 'ダブルクリックで編集'; // ホバーで編集方法を表示
+        titleDiv.title = 'Click: Subtasks | Double-click: Edit';
         titleDiv.dataset.routineId = routine.id;
-        titleDiv.ondblclick = () => makeEditable(titleDiv, routine.id);
+        titleDiv.onclick = () => openSubtaskModal(routine.id, routine.title);
+        titleDiv.ondblclick = (e) => {
+            e.stopPropagation(); // シングルクリックイベントを防止
+            makeEditable(titleDiv, routine.id);
+        };
         li.appendChild(titleDiv);
 
         // 週ごとの状態表示 (チェックボックス)
@@ -552,7 +567,19 @@ newRoutineTitleInput.addEventListener('keypress', (e) => {
 
 // 日次ステータス切り替え
 async function toggleDay(routineId, date) {
+    // まずサブタスクの有無を確認
     try {
+        const subtasksResponse = await fetch(`/api/routines/${routineId}/subtasks`);
+        if (!subtasksResponse.ok) throw new Error('Failed to fetch subtasks');
+        const subtasks = await subtasksResponse.json();
+
+        // サブタスクがある場合は実績モーダルを開く
+        if (subtasks.length > 0) {
+            await openSubtaskCompletionModal(routineId, date);
+            return;
+        }
+
+        // サブタスクがない場合は通常のトグル処理
         const response = await fetch(`/api/routines/${routineId}/toggle`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -673,6 +700,215 @@ todoInput.addEventListener('keypress', (e) => {
 todoInput.placeholder = "Click + to add routine...";
 todoInput.readOnly = true; // 入力不可にしてボタンっぽくする
 todoInput.onclick = openAddModal;
+
+// ========== サブタスク機能 ==========
+
+// サブタスク管理モーダルを開く
+async function openSubtaskModal(routineId, routineTitle) {
+    currentSubtaskRoutineId = routineId;
+    subtaskParentTitle.textContent = routineTitle;
+    subtaskInput.value = '';
+
+    // サブタスク一覧を取得して表示
+    await loadSubtasks(routineId);
+
+    subtaskModal.style.display = 'flex';
+    setTimeout(() => subtaskModal.classList.add('active'), 10);
+    subtaskInput.focus();
+}
+
+// サブタスク管理モーダルを閉じる
+function closeSubtaskModal() {
+    subtaskModal.classList.remove('active');
+    setTimeout(() => {
+        subtaskModal.style.display = 'none';
+        currentSubtaskRoutineId = null;
+    }, 300);
+    // リストを更新してサブタスク数バッジを反映
+    fetchRoutines();
+}
+
+// サブタスク一覧を読み込んで表示
+async function loadSubtasks(routineId) {
+    try {
+        const response = await fetch(`/api/routines/${routineId}/subtasks`);
+        if (!response.ok) throw new Error('Failed to fetch subtasks');
+        const subtasks = await response.json();
+
+        renderSubtasks(subtasks);
+    } catch (error) {
+        console.error('Error loading subtasks:', error);
+    }
+}
+
+// サブタスク一覧を描画
+function renderSubtasks(subtasks) {
+    subtaskList.innerHTML = '';
+
+    if (subtasks.length === 0) {
+        subtaskList.innerHTML = '<li style="text-align: center; color: var(--text-muted); padding: 2rem;">No subtasks yet. Add one above!</li>';
+        return;
+    }
+
+    subtasks.forEach(subtask => {
+        const li = document.createElement('li');
+        li.className = 'subtask-item';
+
+        const title = document.createElement('span');
+        title.className = 'subtask-item-title';
+        title.textContent = subtask.title;
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'subtask-delete-btn';
+        deleteBtn.innerHTML = '<ion-icon name="trash-outline"></ion-icon>';
+        deleteBtn.onclick = () => deleteSubtask(subtask.id);
+
+        li.appendChild(title);
+        li.appendChild(deleteBtn);
+        subtaskList.appendChild(li);
+    });
+}
+
+// サブタスク追加
+async function addSubtask() {
+    const title = subtaskInput.value.trim();
+    if (!title) return;
+
+    try {
+        const response = await fetch(`/api/routines/${currentSubtaskRoutineId}/subtasks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title })
+        });
+
+        if (response.ok) {
+            subtaskInput.value = '';
+            await loadSubtasks(currentSubtaskRoutineId);
+        }
+    } catch (error) {
+        console.error('Error adding subtask:', error);
+    }
+}
+
+// サブタスク削除
+async function deleteSubtask(subtaskId) {
+    if (!confirm('Delete this subtask?')) return;
+
+    try {
+        const response = await fetch(`/api/subtasks/${subtaskId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            await loadSubtasks(currentSubtaskRoutineId);
+        }
+    } catch (error) {
+        console.error('Error deleting subtask:', error);
+    }
+}
+
+// Enterキーでサブタスク追加
+subtaskInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') addSubtask();
+});
+
+// サブタスク実績モーダルを開く
+async function openSubtaskCompletionModal(routineId, date) {
+    currentSubtaskRoutineId = routineId;
+    currentSubtaskDate = date;
+
+    subtaskDateDisplay.textContent = date;
+
+    // サブタスクと実績を取得
+    try {
+        const response = await fetch(`/api/routines/${routineId}/subtasks/logs?date=${date}`);
+        if (!response.ok) throw new Error('Failed to fetch subtask logs');
+        const subtaskLogs = await response.json();
+
+        renderSubtaskCompletionList(subtaskLogs);
+
+        subtaskCompletionModal.style.display = 'flex';
+        setTimeout(() => subtaskCompletionModal.classList.add('active'), 10);
+    } catch (error) {
+        console.error('Error loading subtask completion:', error);
+    }
+}
+
+// サブタスク実績モーダルを閉じる
+function closeSubtaskCompletionModal() {
+    subtaskCompletionModal.classList.remove('active');
+    setTimeout(() => {
+        subtaskCompletionModal.style.display = 'none';
+        currentSubtaskRoutineId = null;
+        currentSubtaskDate = null;
+    }, 300);
+    // 完了状態を更新
+    fetchRoutines();
+}
+
+// サブタスク実績リストを描画
+function renderSubtaskCompletionList(subtaskLogs) {
+    subtaskCompletionList.innerHTML = '';
+
+    if (subtaskLogs.length === 0) {
+        subtaskCompletionList.innerHTML = '<li style="text-align: center; color: var(--text-muted); padding: 2rem;">No subtasks for this routine.</li>';
+        return;
+    }
+
+    subtaskLogs.forEach(log => {
+        const li = document.createElement('li');
+        li.className = 'subtask-completion-item';
+        if (log.completed) li.classList.add('completed');
+
+        const checkbox = document.createElement('div');
+        checkbox.className = 'subtask-checkbox';
+        checkbox.innerHTML = '<ion-icon name="checkmark-outline"></ion-icon>';
+
+        const title = document.createElement('span');
+        title.className = 'subtask-completion-title';
+        title.textContent = log.title;
+
+        li.appendChild(checkbox);
+        li.appendChild(title);
+        li.onclick = () => toggleSubtaskCompletion(log.id);
+
+        subtaskCompletionList.appendChild(li);
+    });
+}
+
+// サブタスク完了状態切り替え
+async function toggleSubtaskCompletion(subtaskId) {
+    try {
+        const response = await fetch(`/api/subtasks/${subtaskId}/toggle`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date: currentSubtaskDate })
+        });
+
+        if (response.ok) {
+            // リストを再読み込み
+            const logsResponse = await fetch(`/api/routines/${currentSubtaskRoutineId}/subtasks/logs?date=${currentSubtaskDate}`);
+            const subtaskLogs = await logsResponse.json();
+            renderSubtaskCompletionList(subtaskLogs);
+        }
+    } catch (error) {
+        console.error('Error toggling subtask:', error);
+    }
+}
+
+// モーダル外クリックで閉じる（既存のwindow.onclickを上書き）
+window.onclick = (event) => {
+    if (event.target == modal) closeModal();
+    if (event.target == addModal) closeAddModal();
+    if (event.target == dailyTasksModal) closeDailyTasks();
+    if (event.target == subtaskModal) closeSubtaskModal();
+    if (event.target == subtaskCompletionModal) closeSubtaskCompletionModal();
+};
+
+// グローバルスコープ関数として公開（サブタスクモーダル用）
+window.closeSubtaskModal = closeSubtaskModal;
+window.closeSubtaskCompletionModal = closeSubtaskCompletionModal;
+
 
 // 初期ロード
 fetchRoutines();

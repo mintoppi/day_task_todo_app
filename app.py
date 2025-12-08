@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta, date
 from flask import Flask, render_template, request, jsonify
-from models import db, Routine, RoutineLog
+from models import db, Routine, RoutineLog, Subtask, SubtaskLog
 
 app = Flask(__name__)
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -169,6 +169,89 @@ def get_routine_history(routine_id):
         'year': year,
         'completed_dates': [log.date_str for log in logs]
     })
+
+# ========== サブタスク関連 API ==========
+
+# サブタスク一覧取得 API
+@app.route('/api/routines/<int:routine_id>/subtasks', methods=['GET'])
+def get_subtasks(routine_id):
+    routine = Routine.query.get_or_404(routine_id)
+    subtasks = Subtask.query.filter_by(routine_id=routine_id).order_by(Subtask.order).all()
+    
+    return jsonify([subtask.to_dict() for subtask in subtasks])
+
+# サブタスク追加 API
+@app.route('/api/routines/<int:routine_id>/subtasks', methods=['POST'])
+def add_subtask(routine_id):
+    routine = Routine.query.get_or_404(routine_id)
+    data = request.get_json()
+    title = data.get('title')
+    
+    if not title:
+        return jsonify({'error': 'Title is required'}), 400
+    
+    # 最大のorderを取得して+1
+    max_order_result = db.session.query(db.func.max(Subtask.order)).filter_by(routine_id=routine_id).scalar()
+    next_order = (max_order_result or 0) + 1
+    
+    new_subtask = Subtask(routine_id=routine_id, title=title, order=next_order)
+    db.session.add(new_subtask)
+    db.session.commit()
+    
+    return jsonify(new_subtask.to_dict()), 201
+
+# サブタスク削除 API
+@app.route('/api/subtasks/<int:subtask_id>', methods=['DELETE'])
+def delete_subtask(subtask_id):
+    subtask = Subtask.query.get_or_404(subtask_id)
+    db.session.delete(subtask)
+    db.session.commit()
+    
+    return jsonify({'message': 'Subtask deleted'})
+
+# サブタスクの完了状態切り替え API
+@app.route('/api/subtasks/<int:subtask_id>/toggle', methods=['POST'])
+def toggle_subtask(subtask_id):
+    subtask = Subtask.query.get_or_404(subtask_id)
+    data = request.json
+    date_str = data.get('date')
+    
+    if not date_str:
+        return jsonify({'error': 'Date is required'}), 400
+    
+    log = SubtaskLog.query.filter_by(subtask_id=subtask.id, date_str=date_str).first()
+    
+    if log:
+        log.completed = not log.completed
+    else:
+        log = SubtaskLog(subtask_id=subtask.id, date_str=date_str, completed=True)
+        db.session.add(log)
+    
+    db.session.commit()
+    return jsonify({'date': date_str, 'completed': log.completed})
+
+# 特定日のサブタスクログ一覧取得 API
+@app.route('/api/routines/<int:routine_id>/subtasks/logs', methods=['GET'])
+def get_subtask_logs(routine_id):
+    date_str = request.args.get('date')
+    if not date_str:
+        return jsonify({'error': 'Date is required'}), 400
+    
+    routine = Routine.query.get_or_404(routine_id)
+    subtasks = Subtask.query.filter_by(routine_id=routine_id).order_by(Subtask.order).all()
+    
+    result = []
+    for subtask in subtasks:
+        log = SubtaskLog.query.filter_by(subtask_id=subtask.id, date_str=date_str).first()
+        result.append({
+            'id': subtask.id,
+            'title': subtask.title,
+            'order': subtask.order,
+            'completed': log.completed if log else False
+        })
+    
+    return jsonify(result)
+
 
 if __name__ == '__main__':
     # 外部アクセス許可、ポート5001で起動

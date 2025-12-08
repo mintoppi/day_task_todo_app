@@ -964,3 +964,136 @@ button.add-btn:hover {
         height: 40px;
     }
 }
+
+/* ========== サブタスク関連スタイル ========== */
+
+/* サブタスクリスト */
+.subtask-list {
+    list-style: none;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.subtask-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.2s ease;
+}
+
+.subtask-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    transform: translateX(4px);
+}
+
+.subtask-item-title {
+    flex: 1;
+    color: var(--text-color);
+    font-size: 0.95rem;
+}
+
+.subtask-delete-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.subtask-delete-btn:hover {
+    color: var(--danger-color);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* サブタスク完了リスト */
+.subtask-completion-list {
+    list-style: none;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.subtask-completion-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.subtask-completion-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    transform: scale(1.02);
+}
+
+.subtask-completion-item.completed {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: var(--success-color);
+}
+
+.subtask-checkbox {
+    width: 28px;
+    height: 28px;
+    border: 2px solid var(--border-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.subtask-completion-item.completed .subtask-checkbox {
+    background: var(--success-color);
+    border-color: var(--success-color);
+}
+
+.subtask-checkbox ion-icon {
+    font-size: 18px;
+    color: white;
+    opacity: 0;
+}
+
+.subtask-completion-item.completed .subtask-checkbox ion-icon {
+    opacity: 1;
+}
+
+.subtask-completion-title {
+    flex: 1;
+    color: var(--text-color);
+    font-size: 1rem;
+}
+
+.subtask-completion-item.completed .subtask-completion-title {
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+/* サブタスク数表示バッジ */
+.subtask-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(59, 130, 246, 0.2);
+    color: var(--primary-color);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    margin-left: 0.5rem;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
