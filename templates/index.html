@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Routine Tracker</title>
+    <!-- Google Fonts の読み込み -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- スタイルシート -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=9">
+    <!-- Ionicons アイコンライブラリ -->
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <!-- アプリケーションのメインカード -->
+        <div class="app-card">
+            <header>
+                <h1>Routine Tracker</h1>
+                <p class="subtitle">Build Better Habits</p>
+            </header>
+
+            <!-- 入力グループ: 新しいルーチンの追加 -->
+            <div class="input-group">
+                <input type="text" id="todo-input" placeholder="New Routine..." autocomplete="off">
+                <button id="add-btn" class="add-btn">
+                    <ion-icon name="add-outline"></ion-icon> Add
+                </button>
+            </div>
+
+            <!-- ユーティリティバー (履歴など) -->
+            <div class="utility-bar">
+                <!-- New Today Button -->
+                <button id="daily-tasks-btn" class="icon-btn" title="Today's Tasks">
+                    <ion-icon name="list-outline"></ion-icon> Today
+                </button>
+                <button id="global-history-btn" class="icon-btn" title="Global History">
+                    <ion-icon name="calendar-outline"></ion-icon> History
+                </button>
+            </div>
+
+            <!-- 週ナビゲーション: 先週/来週への移動 -->
+            <div class="week-navigation">
+                <button class="nav-btn" onclick="changeWeek(-1)">
+                    <ion-icon name="chevron-back-outline"></ion-icon>
+                </button>
+                <span id="week-range-display">Loading...</span>
+                <button class="nav-btn" onclick="changeWeek(1)">
+                    <ion-icon name="chevron-forward-outline"></ion-icon>
+                </button>
+            </div>
+
+            <!-- 週ヘッダー: 曜日を表示 (JSで動的生成) -->
+            <div class="week-header" id="week-header">
+                <!-- Days will be inserted here -->
+            </div>
+
+            <!-- ルーチンリスト: タスク一覧 -->
+            <ul id="todo-list" class="todo-list">
+                <!-- Routine items will be added here -->
+            </ul>
+        </div>
+    </div>
+
+    <!-- 新規ルーチン追加モーダル -->
+    <div id="add-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add New Routine</h2>
+                <button class="close-btn" onclick="closeAddModal()">
+                    <ion-icon name="close-outline"></ion-icon>
+                </button>
+            </div>
+
+            <input type="text" id="new-routine-title" placeholder="Routine Name" class="modal-input" autocomplete="off">
+
+            <div class="day-selector-label">Select Days:</div>
+            <div class="day-selector">
+                <div class="day-option selected" data-day="0">
+                    <div class="option-check"><ion-icon name="checkmark-outline"></ion-icon></div>
+                    <span>Sun</span>
+                </div>
+                <div class="day-option selected" data-day="1">
+                    <div class="option-check"><ion-icon name="checkmark-outline"></ion-icon></div>
+                    <span>Mon</span>
+                </div>
+                <div class="day-option selected" data-day="2">
+                    <div class="option-check"><ion-icon name="checkmark-outline"></ion-icon></div>
+                    <span>Tue</span>
+                </div>
+                <div class="day-option selected" data-day="3">
+                    <div class="option-check"><ion-icon name="checkmark-outline"></ion-icon></div>
+                    <span>Wed</span>
+                </div>
+                <div class="day-option selected" data-day="4">
+                    <div class="option-check"><ion-icon name="checkmark-outline"></ion-icon></div>
+                    <span>Thu</span>
+                </div>
+                <div class="day-option selected" data-day="5">
+                    <div class="option-check"><ion-icon name="checkmark-outline"></ion-icon></div>
+                    <span>Fri</span>
+                </div>
+                <div class="day-option selected" data-day="6">
+                    <div class="option-check"><ion-icon name="checkmark-outline"></ion-icon></div>
+                    <span>Sat</span>
+                </div>
+            </div>
+
+            <button class="save-btn" onclick="saveNewRoutine()">Create Routine</button>
+        </div>
+    </div>
+    <!-- 履歴モーダル: グローバルカレンダー表示用 -->
+    <div id="history-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">History</h2>
+                <button class="close-btn" onclick="closeModal()">
+                    <ion-icon name="close-outline"></ion-icon>
+                </button>
+            </div>
+
+            <!-- カレンダー表示 -->
+            <div id="calendar-container">
+                <div class="calendar-controls">
+                    <button class="nav-btn" onclick="changeMonth(-1)">
+                        <ion-icon name="chevron-back-outline"></ion-icon>
+                    </button>
+                    <h3 id="calendar-month-title">Month Year</h3>
+                    <button class="nav-btn" onclick="changeMonth(1)">
+                        <ion-icon name="chevron-forward-outline"></ion-icon>
+                    </button>
+                </div>
+                <!-- 曜日ヘッダー -->
+                <div class="calendar-days-header">
+                    <div>Sun</div>
+                    <div>Mon</div>
+                    <div>Tue</div>
+                    <div>Wed</div>
+                    <div>Thu</div>
+                    <div>Fri</div>
+                    <div>Sat</div>
+                </div>
+                <!-- カレンダーグリッド -->
+                <div id="calendar-grid" class="calendar-grid"></div>
+            </div>
+
+            <!-- 履歴リスト表示 (日付ごとの達成タスク) -->
+            <div class="history-list-section">
+                <h4>Completion History</h4>
+                <ul id="history-list" class="history-list">
+                    <!-- History items will be inserted here -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Daily Tasks Modal -->
+    <div id="daily-tasks-modal" class="modal">
+        <div class="modal-content card-modal">
+            <span class="close-btn" onclick="closeDailyTasks()">&times;</span>
+            <h2 id="encourage-msg" class="encourage-msg"></h2>
+            <h3>Today's Focus</h3>
+            <ul id="daily-task-list" class="daily-task-list">
+                <!-- Tasks injected here -->
+            </ul>
+        </div>
+    </div>
+
+    <!-- メインスクリプト -->
+    <script src="{{ url_for('static', filename='script.js') }}?v=2"></script>
+</body>
+
+</html>
