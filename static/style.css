@@ -965,135 +965,275 @@ button.add-btn:hover {
     }
 }
 
-/* ========== サブタスク関連スタイル ========== */
-
-/* サブタスクリスト */
+/* Subtask Styles */
 .subtask-list {
-    list-style: none;
-    max-height: 400px;
-    overflow-y: auto;
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-left: 1.5rem;
+    margin-top: 0.5rem;
+    border-left: 2px solid rgba(255, 255, 255, 0.1);
 }
 
 .subtask-item {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 0.75rem 1rem;
-    margin-bottom: 0.5rem;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr) 40px;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+}
+
+.subtask-title {
+    grid-column: 1 / -1;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.subtask-title .title-text {
+    cursor: pointer;
+}
+
+.subtask-title .title-text:hover {
+    color: var(--text-color);
+    text-decoration: underline;
+}
+
+.status-indicator.derived {
+    cursor: default;
+    opacity: 0.7;
+    position: relative;
+    border-style: dashed;
+}
+
+.status-indicator.derived::after {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background-color: currentColor;
+    border-radius: 50%;
+}
+
+.add-subtask-btn {
+    background: transparent;
+    border: none;
+    color: var(--primary-color);
+    font-size: 1.4rem;
+    /* Larger icon */
+    cursor: pointer;
+    padding: 8px;
+    /* Larger hit area */
+    border-radius: 50%;
+    /* Circle hover effect */
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    transition: all 0.2s ease;
+    justify-content: center;
+    margin-left: 0.5rem;
+    transition: background 0.2s ease;
 }
 
-.subtask-item:hover {
-    background: rgba(255, 255, 255, 0.05);
-    transform: translateX(4px);
+.add-subtask-btn:hover {
+    background: rgba(59, 130, 246, 0.2);
+    transform: scale(1.1);
 }
 
-.subtask-item-title {
-    flex: 1;
-    color: var(--text-color);
-    font-size: 0.95rem;
+.subtask-item .status-indicator {
+    width: 20px;
+    height: 20px;
+    font-size: 7px;
 }
 
 .subtask-delete-btn {
+    grid-row: 2;
+    grid-column: 8;
     background: transparent;
     border: none;
     color: var(--text-muted);
     cursor: pointer;
-    padding: 0.25rem 0.5rem;
-    border-radius: 6px;
-    transition: all 0.2s ease;
     display: flex;
-    align-items: center;
     justify-content: center;
+    align-items: center;
 }
 
 .subtask-delete-btn:hover {
     color: var(--danger-color);
-    background: rgba(239, 68, 68, 0.1);
 }
 
-/* サブタスク完了リスト */
-.subtask-completion-list {
-    list-style: none;
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.subtask-completion-item {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 1rem;
-    margin-bottom: 0.75rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
+/* Detail Modal Styles */
+.editable-title {
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease;
+    border-bottom: 1px dashed transparent;
 }
 
-.subtask-completion-item:hover {
+.editable-title:hover {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+.detail-section h3 {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    color: var(--text-color);
+}
+
+.modal-add-btn {
+    width: 100%;
+    margin-top: 1rem;
+    padding: 0.8rem;
     background: rgba(255, 255, 255, 0.05);
-    transform: scale(1.02);
-}
-
-.subtask-completion-item.completed {
-    background: rgba(16, 185, 129, 0.1);
-    border-color: var(--success-color);
-}
-
-.subtask-checkbox {
-    width: 28px;
-    height: 28px;
-    border: 2px solid var(--border-color);
-    border-radius: 50%;
+    border: 1px dashed var(--border-color);
+    color: var(--text-muted);
+    border-radius: 8px;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 0.5rem;
     transition: all 0.2s ease;
-    flex-shrink: 0;
 }
 
-.subtask-completion-item.completed .subtask-checkbox {
-    background: var(--success-color);
-    border-color: var(--success-color);
-}
-
-.subtask-checkbox ion-icon {
-    font-size: 18px;
-    color: white;
-    opacity: 0;
-}
-
-.subtask-completion-item.completed .subtask-checkbox ion-icon {
-    opacity: 1;
-}
-
-.subtask-completion-title {
-    flex: 1;
-    color: var(--text-color);
-    font-size: 1rem;
-}
-
-.subtask-completion-item.completed .subtask-completion-title {
-    color: var(--text-muted);
-    text-decoration: line-through;
-}
-
-/* サブタスク数表示バッジ */
-.subtask-count {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(59, 130, 246, 0.2);
+.modal-add-btn:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: var(--primary-color);
     color: var(--primary-color);
-    font-size: 0.75rem;
-    font-weight: 700;
-    padding: 0.25rem 0.5rem;
-    border-radius: 12px;
-    margin-left: 0.5rem;
-    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.modal-subtask-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.modal-subtask-item {
+    /* Flat grid for desktop might be easier for alignment */
+    display: grid;
+    grid-template-columns: 1fr repeat(7, 24px) 30px;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+}
+
+.modal-subtask-title {
+    font-size: 0.9rem;
+    color: var(--text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.modal-subtask-days {
+    display: contents;
+    /* Use parent's grid! Perfect for this. */
+}
+
+/* Modal Week Header - aligns with days wrapper hopefully if strictly sized */
+.week-header-modal {
+    display: grid;
+    /* The days part of the header needs to be a sub-grid or similar width container */
+    /* But header is 8 divs (Task + 7 Days). We need to structure it or fake it. */
+    /* script.js renders header as: div(Task), div(Sun)...div(Sat), div(Spacer) */
+    /* That's 9 elements. */
+    /* Layout: 1fr (Task), repeat(7, 24px) (Days), 30px (Spacer) */
+    /* The gap in item between title and days is 0.5rem. */
+    grid-template-columns: 1fr repeat(7, 24px) 30px;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding: 0 0.5rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* Skip first col (title) in header text alignment if needed, but grid handles it */
+.week-header-modal div:first-child {
+    text-align: left;
+}
+
+/* Reuse status indicator styles but maybe smaller for modal? */
+.modal-subtask-item .status-indicator {
+    width: 24px;
+    height: 24px;
+    font-size: 9px;
+    margin: 0 auto;
+}
+
+@media (max-width: 640px) {
+    .detail-section h3 {
+        text-align: center;
+    }
+
+    .modal-subtask-item {
+        /* Mobile: Vertical stack */
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        /* Full width */
+        gap: 0.8rem;
+        padding: 0.8rem;
+    }
+
+    .modal-subtask-days {
+        display: flex;
+        /* Turn off 'contents' */
+        justify-content: space-between;
+        width: 100%;
+        gap: 2px;
+    }
+
+    .modal-subtask-days .status-indicator {
+        width: 32px;
+        /* Bigger touch target on mobile */
+        height: 32px;
+        font-size: 10px;
+    }
+
+    .week-header-modal {
+        display: none;
+        /* Hide header on mobile, checkboxes are self-evident or use day initial if needed */
+        /* But script renders blank text for checkboxes.. maybe add day initial in JS? */
+        /* For now just hide header, usually context is enough or we add letters dynamically */
+    }
+
+    .subtask-delete-btn {
+        align-self: flex-end;
+        background: rgba(255, 0, 0, 0.1);
+        width: 100%;
+        border-radius: 4px;
+        margin-top: 0.5rem;
+    }
+}
+
+.modal-subtask-list {
+    max-height: 50vh;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+    /* Space for scrollbar */
+    scrollbar-width: thin;
+    /* Firefox */
+    scrollbar-color: var(--text-muted) transparent;
+}
+
+/* Scrollbar styling for Webkit */
+.modal-subtask-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.modal-subtask-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.modal-subtask-list::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
 }

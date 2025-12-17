@@ -112,6 +112,31 @@
             <button class="save-btn" onclick="saveNewRoutine()">Create Routine</button>
         </div>
     </div>
+    <!-- Task Detail Modal -->
+    <div id="detail-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="detail-modal-title" class="editable-title" title="Click to rename">Routine Title</h2>
+                <button class="close-btn" onclick="closeDetailModal()">
+                    <ion-icon name="close-outline"></ion-icon>
+                </button>
+            </div>
+
+            <div class="detail-section">
+                <h3>Subtasks</h3>
+                <div class="week-header-modal" id="modal-week-header">
+                    <!-- Weekday headers for subtask grid -->
+                </div>
+                <ul id="modal-subtask-list" class="modal-subtask-list">
+                    <!-- Subtasks injected here -->
+                </ul>
+                <button id="modal-add-subtask-btn" class="modal-add-btn">
+                    <ion-icon name="add-outline"></ion-icon> Add Subtask
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- 履歴モーダル: グローバルカレンダー表示用 -->
     <div id="history-modal" class="modal">
         <div class="modal-content">
@@ -149,47 +174,11 @@
 
             <!-- 履歴リスト表示 (日付ごとの達成タスク) -->
             <div class="history-list-section">
-                <h4>Completion History</h4>
+                <h4>ルーティン完了実績</h4>
                 <ul id="history-list" class="history-list">
                     <!-- History items will be inserted here -->
                 </ul>
             </div>
-        </div>
-    </div>
-
-    <!-- サブタスク管理モーダル -->
-    <div id="subtask-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Manage Subtasks: <span id="subtask-parent-title"></span></h2>
-                <button class="close-btn" onclick="closeSubtaskModal()">
-                    <ion-icon name="close-outline"></ion-icon>
-                </button>
-            </div>
-
-            <input type="text" id="subtask-input" placeholder="Add subtask..." class="modal-input" autocomplete="off">
-
-            <ul id="subtask-list" class="subtask-list">
-                <!-- Subtasks will be inserted here -->
-            </ul>
-        </div>
-    </div>
-
-    <!-- サブタスク実績入力モーダル -->
-    <div id="subtask-completion-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Complete Subtasks</h2>
-                <button class="close-btn" onclick="closeSubtaskCompletionModal()">
-                    <ion-icon name="close-outline"></ion-icon>
-                </button>
-            </div>
-
-            <p id="subtask-date-display" style="text-align: center; color: var(--text-muted); margin-bottom: 1rem;"></p>
-
-            <ul id="subtask-completion-list" class="subtask-completion-list">
-                <!-- Subtasks for completion will be inserted here -->
-            </ul>
         </div>
     </div>
 
@@ -202,6 +191,20 @@
             <ul id="daily-task-list" class="daily-task-list">
                 <!-- Tasks injected here -->
             </ul>
+        </div>
+    </div>
+
+    <!-- Generic Input Modal -->
+    <div id="input-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="input-modal-title">Edit</h2>
+                <button class="close-btn" onclick="closeInputModal()">
+                    <ion-icon name="close-outline"></ion-icon>
+                </button>
+            </div>
+            <input type="text" id="input-modal-value" class="modal-input" autocomplete="off">
+            <button id="input-modal-save-btn" class="save-btn">Save</button>
         </div>
     </div>
 

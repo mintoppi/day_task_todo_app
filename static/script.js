@@ -14,23 +14,13 @@ const calendarGrid = document.getElementById('calendar-grid');
 const calendarMonthTitle = document.getElementById('calendar-month-title');
 const historyList = document.getElementById('history-list');
 
-// サブタスクモーダル関連の要素
-const subtaskModal = document.getElementById('subtask-modal');
-const subtaskParentTitle = document.getElementById('subtask-parent-title');
-const subtaskInput = document.getElementById('subtask-input');
-const subtaskList = document.getElementById('subtask-list');
-const subtaskCompletionModal = document.getElementById('subtask-completion-modal');
-const subtaskDateDisplay = document.getElementById('subtask-date-display');
-const subtaskCompletionList = document.getElementById('subtask-completion-list');
-
 // 状態管理変数
 let currentRoutineId = null;
 let currentViewDate = new Date(); // カレンダーで表示中の月
 let cachedHistoryData = null; // 取得した履歴データのキャッシュ
 let currentWeekOffset = 0; // 週オフセット (0 = 今週)
 let globalRoutines = []; // 追加: 全ルーチンのキャッシュ
-let currentSubtaskRoutineId = null; // サブタスク管理中のルーチンID
-let currentSubtaskDate = null; // サブタスク実績入力中の日付
+let cachedWeekDates = [];
 
 // ルーチン一覧の取得と表示
 async function fetchRoutines() {
@@ -41,6 +31,7 @@ async function fetchRoutines() {
         const data = await response.json();
 
         globalRoutines = data.routines; // グローバル変数に保存
+        cachedWeekDates = data.week_dates; // Save for modal usage
 
         // ヘッダーとリストの更新
         renderWeekHeader(data.week_dates);
@@ -120,18 +111,29 @@ function renderRoutines(routines, weekDates) {
         const li = document.createElement('li');
         li.className = 'todo-item routine-item';
 
-        // ルーチン名表示 (シングルクリック: サブタスク管理、ダブルクリック: タイトル編集)
+        // ルーチン名表示 (クリックで編集可能) + サブタスク追加ボタン
+        // Cleaned up: Title clicks now open Detail Modal
         const titleDiv = document.createElement('div');
         titleDiv.className = 'routine-title';
-        titleDiv.innerText = routine.title;
-        titleDiv.title = 'Click: Subtasks | Double-click: Edit';
-        titleDiv.dataset.routineId = routine.id;
-        titleDiv.onclick = () => openSubtaskModal(routine.id, routine.title);
-        titleDiv.ondblclick = (e) => {
-            e.stopPropagation(); // シングルクリックイベントを防止
-            makeEditable(titleDiv, routine.id);
-        };
+        titleDiv.style.display = 'flex';
+        titleDiv.style.alignItems = 'center';
+
+        // Entire titleRow is clickable to open modal
+        titleDiv.style.cursor = 'pointer';
+        titleDiv.onclick = () => openTaskDetailModal(routine.id);
+
+        const textSpan = document.createElement('span');
+        textSpan.innerText = routine.title;
+        textSpan.title = routine.title;
+        textSpan.style.flex = 1;
+        titleDiv.appendChild(textSpan);
+
+        // Remove inline add button, it's now in the modal
+
         li.appendChild(titleDiv);
+
+        // check if routine has subtasks
+        const hasSubtasks = routine.subtasks && routine.subtasks.length > 0;
 
         // 週ごとの状態表示 (チェックボックス)
         routine.week_logs.forEach(log => {
@@ -147,6 +149,13 @@ function renderRoutines(routines, weekDates) {
             const checkbox = document.createElement('div');
             checkbox.className = `status-indicator ${isCompleted ? 'completed' : ''}`;
 
+            if (hasSubtasks) {
+                checkbox.classList.add('derived');
+                checkbox.title = "View details to manage subtasks";
+                // Even derived, clicking it should probably open the modal for clarity?
+                checkbox.onclick = () => openTaskDetailModal(routine.id);
+            }
+
             // 曜日テキストの計算
             const dateObj = new Date(log.date);
             const dayIndex = dateObj.getUTCDay(); // 0-6
@@ -158,7 +167,9 @@ function renderRoutines(routines, weekDates) {
             const isTargetDay = targetDays.includes(String(dayIndex));
 
             if (isTargetDay) {
-                checkbox.onclick = () => toggleDay(routine.id, log.date);
+                if (!hasSubtasks) {
+                    checkbox.onclick = () => toggleDay(routine.id, log.date);
+                }
             } else {
                 checkbox.style.opacity = '0.2';
                 checkbox.style.cursor = 'default';
@@ -179,12 +190,53 @@ function renderRoutines(routines, weekDates) {
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'delete-btn';
         deleteBtn.innerHTML = '<ion-icon name="trash-outline"></ion-icon>';
-        deleteBtn.onclick = () => deleteRoutine(routine.id);
+        // Stop propagation to prevent opening modal when deleting
+        deleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            deleteRoutine(routine.id);
+        };
         actionsDiv.appendChild(deleteBtn);
 
         li.appendChild(actionsDiv);
+
+        // Removed Inline Subtasks Rendering
+
         todoList.appendChild(li);
     });
+}
+
+// Removed old addSubtask here to use modal version at bottom
+
+// サブタスク削除
+async function deleteSubtask(subtaskId) {
+    if (!confirm("Delete this subtask?")) return;
+    try {
+        const response = await fetch(`/api/subtasks/${subtaskId}`, {
+            method: 'DELETE'
+        });
+        if (response.ok) {
+            fetchRoutines();
+        }
+    } catch (error) {
+        console.error('Error deleting subtask:', error);
+    }
+}
+
+// サブタスク切り替え
+async function toggleSubtask(subtaskId, date) {
+    try {
+        const response = await fetch(`/api/subtasks/${subtaskId}/toggle`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date: date })
+        });
+
+        if (response.ok) {
+            fetchRoutines(); // Refresh to update parent status
+        }
+    } catch (error) {
+        console.error('Error toggling subtask:', error);
+    }
 }
 
 // --- グローバル履歴モーダル関連 ---
@@ -211,7 +263,7 @@ async function openGlobalHistory() {
         });
 
         cachedHistoryData = map; // データキャッシュ
-        modalTitle.textContent = "Global History";
+        modalTitle.textContent = "ルーティン実績";
 
         renderCalendar();
         renderGlobalHistoryList(map);
@@ -275,9 +327,9 @@ function renderCalendar() {
     console.log("Rendering Calendar for:", year, month + 1);
     console.log("Global Routines Count:", globalRoutines.length);
 
-    // 月タイトルの更新
-    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    calendarMonthTitle.textContent = `${monthNames[month]} ${year}`;
+    // 月タイトルの更新 (YYYY/MM)
+    const mStrTitle = String(month + 1).padStart(2, '0');
+    calendarMonthTitle.textContent = `${year}/${mStrTitle}`;
 
     calendarGrid.innerHTML = '';
 
@@ -420,78 +472,9 @@ window.onclick = function (event) {
     }
 }
 
-// ルーチン名をインライン編集可能にする
-function makeEditable(element, routineId) {
-    const originalText = element.innerText;
-
-    // contenteditable を有効化
-    element.contentEditable = true;
-    element.focus();
-
-    // テキストを全選択
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    const selection = window.getSelection();
-    selection.removeAllRanges();
-    selection.addRange(range);
-
-    // スタイルを編集中に変更
-    element.style.background = 'rgba(59, 130, 246, 0.2)';
-    element.style.outline = '2px solid var(--primary-color)';
-    element.style.borderRadius = '4px';
-    element.style.padding = '0.25rem 0.5rem';
-
-    // 保存処理
-    const save = async () => {
-        const newTitle = element.innerText.trim();
-
-        // スタイルをリセット
-        element.contentEditable = false;
-        element.style.background = '';
-        element.style.outline = '';
-        element.style.padding = '';
-
-        if (!newTitle || newTitle === originalText) {
-            element.innerText = originalText;
-            return;
-        }
-
-        try {
-            const response = await fetch(`/api/routines/${routineId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title: newTitle })
-            });
-
-            if (response.ok) {
-                element.title = 'ダブルクリックで編集';
-                fetchRoutines();
-            } else {
-                element.innerText = originalText;
-            }
-        } catch (error) {
-            console.error('Error updating routine:', error);
-            element.innerText = originalText;
-        }
-    };
-
-    // Enter で保存
-    element.onkeydown = (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            save();
-        } else if (e.key === 'Escape') {
-            element.contentEditable = false;
-            element.innerText = originalText;
-            element.style.background = '';
-            element.style.outline = '';
-            element.style.padding = '';
-        }
-    };
-
-    // フォーカスが外れたら保存
-    element.onblur = save;
-}
+// Old implementations removed/replaced by those at the bottom using modal
+// function editRoutine ... 
+// function addSubtask ...
 
 // --- 新規ルーチン追加モーダル関連 ---
 
@@ -567,19 +550,7 @@ newRoutineTitleInput.addEventListener('keypress', (e) => {
 
 // 日次ステータス切り替え
 async function toggleDay(routineId, date) {
-    // まずサブタスクの有無を確認
     try {
-        const subtasksResponse = await fetch(`/api/routines/${routineId}/subtasks`);
-        if (!subtasksResponse.ok) throw new Error('Failed to fetch subtasks');
-        const subtasks = await subtasksResponse.json();
-
-        // サブタスクがある場合は実績モーダルを開く
-        if (subtasks.length > 0) {
-            await openSubtaskCompletionModal(routineId, date);
-            return;
-        }
-
-        // サブタスクがない場合は通常のトグル処理
         const response = await fetch(`/api/routines/${routineId}/toggle`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -617,13 +588,16 @@ const dailyTaskList = document.getElementById('daily-task-list');
 const encourageMsg = document.getElementById('encourage-msg');
 
 const encouragementMessages = [
-    "You can do it! ✨",
-    "Keep up the great work! 🚀",
-    "One step at a time! 🐾",
-    "Believe in yourself! 💪",
-    "Stay focused and consistent! 🎯",
-    "Every effort counts! 🌱",
-    "You are doing amazing! 🌟"
+    "今日は最高の一日になりますよ！✨",
+    "その調子です！🚀",
+    "一歩ずつ進んでいきましょう！🐾",
+    "継続は力なり！💪",
+    "素晴らしい進捗ですね！🌟",
+    "焦らず、マイペースで！🌱",
+    "今日の努力が未来を作ります！🎯",
+    "自分を信じて！🔥",
+    "小さいことの積み重ねが大事です！🧱",
+    "よく頑張っています！👏"
 ];
 
 function openDailyTasks() {
@@ -679,11 +653,265 @@ function closeDailyTasks() {
     setTimeout(() => dailyTasksModal.style.display = 'none', 300);
 }
 
-// Window click to close
+// --- Generic Input Modal Logic ---
+const inputModal = document.getElementById('input-modal');
+const inputModalTitle = document.getElementById('input-modal-title');
+const inputModalValue = document.getElementById('input-modal-value');
+const inputModalSaveBtn = document.getElementById('input-modal-save-btn');
+
+let pendingInputResolve = null;
+
+function openInputModal(title, currentValue = "") {
+    return new Promise((resolve) => {
+        inputModalTitle.textContent = title;
+        inputModalValue.value = currentValue;
+        pendingInputResolve = resolve;
+
+        inputModal.style.display = 'flex';
+        setTimeout(() => {
+            inputModal.classList.add('active');
+            inputModalValue.focus();
+        }, 10);
+    });
+}
+
+function closeInputModal() {
+    inputModal.classList.remove('active');
+    setTimeout(() => {
+        inputModal.style.display = 'none';
+        if (pendingInputResolve) {
+            pendingInputResolve(null);
+            pendingInputResolve = null;
+        }
+    }, 300);
+}
+
+function saveInputModal() {
+    const value = inputModalValue.value.trim();
+    if (pendingInputResolve) {
+        pendingInputResolve(value); // Resolve with value
+        pendingInputResolve = null;
+    }
+    inputModal.classList.remove('active'); // Close manually to avoid null resolve
+    setTimeout(() => {
+        inputModal.style.display = 'none';
+    }, 300);
+}
+
+inputModalSaveBtn.onclick = saveInputModal;
+inputModalValue.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') saveInputModal();
+});
+
+// Window click to close (update existing handler)
+// --- Task Detail Modal Related ---
+
+const detailModal = document.getElementById('detail-modal');
+const detailModalTitle = document.getElementById('detail-modal-title');
+const modalSubtaskList = document.getElementById('modal-subtask-list');
+const modalAddSubtaskBtn = document.getElementById('modal-add-subtask-btn');
+const modalWeekHeader = document.getElementById('modal-week-header');
+
+let currentDetailRoutineId = null;
+
+async function openTaskDetailModal(routineId) {
+    currentDetailRoutineId = routineId;
+    const routine = globalRoutines.find(r => r.id === routineId);
+    if (!routine) return;
+
+    detailModalTitle.textContent = routine.title;
+    detailModalTitle.onclick = () => editRoutineNameInModal(routine.id, routine.title);
+
+    // Render Subtasks
+    renderModalSubtasks(routine);
+
+    // Setup Add Button
+    modalAddSubtaskBtn.onclick = () => addSubtaskFromModal(routine.id);
+
+    detailModal.style.display = 'flex';
+    setTimeout(() => detailModal.classList.add('active'), 10);
+}
+
+function closeDetailModal() {
+    detailModal.classList.remove('active');
+    setTimeout(() => {
+        detailModal.style.display = 'none';
+        currentDetailRoutineId = null;
+    }, 300);
+}
+
+function renderModalSubtasks(routine) {
+    modalSubtaskList.innerHTML = '';
+
+    // Header
+    modalWeekHeader.innerHTML = '<div>Task</div>';
+    const weekDates = cachedWeekDates || []; // We need week dates access. 
+    // We can get it from global scope if we saved it in fetchRoutines?
+    // Let's ensure fetchRoutines saves it.
+
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    // Reconstruct dates from routine.week_logs for header if available, or use global
+    // routine.week_logs has {date, completed}.
+
+    routine.week_logs.forEach(l => {
+        const d = new Date(l.date);
+        const dayName = days[d.getUTCDay()];
+        const div = document.createElement('div');
+        div.textContent = dayName;
+        modalWeekHeader.appendChild(div);
+    });
+    // Add spacer for delete btn
+    modalWeekHeader.appendChild(document.createElement('div'));
+
+
+    if (!routine.subtasks || routine.subtasks.length === 0) {
+        modalSubtaskList.innerHTML = '<li style="text-align:center; color:var(--text-muted); padding:1rem;">No subtasks. Add one to start!</li>';
+    } else {
+        routine.subtasks.forEach(sub => {
+            const li = document.createElement('li');
+            li.className = 'modal-subtask-item';
+
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'modal-subtask-title';
+            titleDiv.textContent = sub.title;
+            li.appendChild(titleDiv);
+
+            // Container for days
+            const daysContainer = document.createElement('div');
+            daysContainer.className = 'modal-subtask-days';
+
+            sub.week_logs.forEach(log => {
+                const isCompleted = log.completed === true;
+                const checkbox = document.createElement('div');
+                checkbox.className = `status-indicator ${isCompleted ? 'completed' : ''}`;
+
+                // Target check
+                const d = new Date(log.date);
+                const dayIdx = d.getUTCDay();
+                const targetDays = routine.target_days ? routine.target_days.split(',') : "0,1,2,3,4,5,6".split(',');
+
+                if (targetDays.includes(String(dayIdx))) {
+                    checkbox.onclick = () => toggleSubtaskInModal(sub.id, log.date);
+                    // Show day initial
+                    const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+                    checkbox.textContent = days[dayIdx];
+                    checkbox.style.fontSize = "10px";
+                    checkbox.style.display = "flex";
+                    checkbox.style.alignItems = "center";
+                    checkbox.style.justifyContent = "center";
+                } else {
+                    checkbox.style.opacity = '0.2';
+                    checkbox.style.cursor = 'default';
+                    checkbox.style.borderStyle = 'dashed';
+                }
+
+                daysContainer.appendChild(checkbox);
+            });
+            li.appendChild(daysContainer);
+
+            const delBtn = document.createElement('button');
+            delBtn.className = 'subtask-delete-btn';
+            delBtn.innerHTML = '<ion-icon name="trash-outline"></ion-icon>';
+            delBtn.onclick = () => deleteSubtaskOnModal(sub.id);
+            li.appendChild(delBtn);
+
+            modalSubtaskList.appendChild(li);
+        });
+    }
+}
+
+async function editRoutineNameInModal(id, currentTitle) {
+    const newTitle = await openInputModal("Rename Routine", currentTitle);
+    if (!newTitle || newTitle === currentTitle) return;
+
+    try {
+        const response = await fetch(`/api/routines/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: newTitle })
+        });
+        if (response.ok) {
+            // Refresh data
+            await fetchRoutines();
+            // Update Modal Title
+            detailModalTitle.textContent = newTitle;
+            // Update onclick handler with new title
+            detailModalTitle.onclick = () => editRoutineNameInModal(id, newTitle);
+        }
+    } catch (error) {
+        console.error('Error renaming:', error);
+    }
+}
+
+async function addSubtaskFromModal(routineId) {
+    const title = await openInputModal("New Subtask Name");
+    if (!title) return;
+
+    try {
+        const response = await fetch(`/api/routines/${routineId}/subtasks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: title })
+        });
+
+        if (response.ok) {
+            await fetchRoutines();
+            // Refresh Modal
+            const updatedRoutine = globalRoutines.find(r => r.id === routineId);
+            renderModalSubtasks(updatedRoutine);
+        }
+    } catch (error) {
+        console.error('Error adding subtask:', error);
+    }
+}
+
+async function deleteSubtaskOnModal(subtaskId) {
+    if (!confirm("Delete this subtask?")) return;
+    try {
+        const response = await fetch(`/api/subtasks/${subtaskId}`, {
+            method: 'DELETE'
+        });
+        if (response.ok) {
+            await fetchRoutines();
+            // Refresh Modal
+            if (currentDetailRoutineId) {
+                const updatedRoutine = globalRoutines.find(r => r.id === currentDetailRoutineId);
+                renderModalSubtasks(updatedRoutine);
+            }
+        }
+    } catch (error) {
+        console.error('Error deleting subtask:', error);
+    }
+}
+
+async function toggleSubtaskInModal(subtaskId, date) {
+    try {
+        const response = await fetch(`/api/subtasks/${subtaskId}/toggle`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date: date })
+        });
+
+        if (response.ok) {
+            await fetchRoutines();
+            // Refresh Modal
+            if (currentDetailRoutineId) {
+                const updatedRoutine = globalRoutines.find(r => r.id === currentDetailRoutineId);
+                renderModalSubtasks(updatedRoutine);
+            }
+        }
+    } catch (error) {
+        console.error('Error toggling subtask:', error);
+    }
+}
+
+// Window click to close (update existing handler)
 window.onclick = (event) => {
     if (event.target == modal) closeModal();
     if (event.target == addModal) closeAddModal();
     if (event.target == dailyTasksModal) closeDailyTasks();
+    if (event.target == inputModal) closeInputModal();
+    if (event.target == detailModal) closeDetailModal();
 };
 
 addBtn.addEventListener('click', openAddModal);
@@ -701,214 +929,47 @@ todoInput.placeholder = "Click + to add routine...";
 todoInput.readOnly = true; // 入力不可にしてボタンっぽくする
 todoInput.onclick = openAddModal;
 
-// ========== サブタスク機能 ==========
+// 初期ロード
+fetchRoutines();
 
-// サブタスク管理モーダルを開く
-async function openSubtaskModal(routineId, routineTitle) {
-    currentSubtaskRoutineId = routineId;
-    subtaskParentTitle.textContent = routineTitle;
-    subtaskInput.value = '';
+// Replace prompt() with openInputModal()
 
-    // サブタスク一覧を取得して表示
-    await loadSubtasks(routineId);
-
-    subtaskModal.style.display = 'flex';
-    setTimeout(() => subtaskModal.classList.add('active'), 10);
-    subtaskInput.focus();
-}
-
-// サブタスク管理モーダルを閉じる
-function closeSubtaskModal() {
-    subtaskModal.classList.remove('active');
-    setTimeout(() => {
-        subtaskModal.style.display = 'none';
-        currentSubtaskRoutineId = null;
-    }, 300);
-    // リストを更新してサブタスク数バッジを反映
-    fetchRoutines();
-}
-
-// サブタスク一覧を読み込んで表示
-async function loadSubtasks(routineId) {
-    try {
-        const response = await fetch(`/api/routines/${routineId}/subtasks`);
-        if (!response.ok) throw new Error('Failed to fetch subtasks');
-        const subtasks = await response.json();
-
-        renderSubtasks(subtasks);
-    } catch (error) {
-        console.error('Error loading subtasks:', error);
-    }
-}
-
-// サブタスク一覧を描画
-function renderSubtasks(subtasks) {
-    subtaskList.innerHTML = '';
-
-    if (subtasks.length === 0) {
-        subtaskList.innerHTML = '<li style="text-align: center; color: var(--text-muted); padding: 2rem;">No subtasks yet. Add one above!</li>';
-        return;
-    }
-
-    subtasks.forEach(subtask => {
-        const li = document.createElement('li');
-        li.className = 'subtask-item';
-
-        const title = document.createElement('span');
-        title.className = 'subtask-item-title';
-        title.textContent = subtask.title;
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'subtask-delete-btn';
-        deleteBtn.innerHTML = '<ion-icon name="trash-outline"></ion-icon>';
-        deleteBtn.onclick = () => deleteSubtask(subtask.id);
-
-        li.appendChild(title);
-        li.appendChild(deleteBtn);
-        subtaskList.appendChild(li);
-    });
-}
-
-// サブタスク追加
-async function addSubtask() {
-    const title = subtaskInput.value.trim();
-    if (!title) return;
+// ルーチン名編集
+async function editRoutine(id, currentTitle) {
+    const newTitle = await openInputModal("Edit Routine Name", currentTitle);
+    if (!newTitle || newTitle === currentTitle) return;
 
     try {
-        const response = await fetch(`/api/routines/${currentSubtaskRoutineId}/subtasks`, {
-            method: 'POST',
+        const response = await fetch(`/api/routines/${id}`, {
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title })
+            body: JSON.stringify({ title: newTitle })
         });
 
         if (response.ok) {
-            subtaskInput.value = '';
-            await loadSubtasks(currentSubtaskRoutineId);
+            fetchRoutines();
+        }
+    } catch (error) {
+        console.error('Error updating routine:', error);
+    }
+}
+
+// サブタスク追加
+async function addSubtask(routineId) {
+    const title = await openInputModal("Enter Subtask Name");
+    if (!title) return;
+
+    try {
+        const response = await fetch(`/api/routines/${routineId}/subtasks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: title })
+        });
+
+        if (response.ok) {
+            fetchRoutines();
         }
     } catch (error) {
         console.error('Error adding subtask:', error);
     }
 }
-
-// サブタスク削除
-async function deleteSubtask(subtaskId) {
-    if (!confirm('Delete this subtask?')) return;
-
-    try {
-        const response = await fetch(`/api/subtasks/${subtaskId}`, {
-            method: 'DELETE'
-        });
-
-        if (response.ok) {
-            await loadSubtasks(currentSubtaskRoutineId);
-        }
-    } catch (error) {
-        console.error('Error deleting subtask:', error);
-    }
-}
-
-// Enterキーでサブタスク追加
-subtaskInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') addSubtask();
-});
-
-// サブタスク実績モーダルを開く
-async function openSubtaskCompletionModal(routineId, date) {
-    currentSubtaskRoutineId = routineId;
-    currentSubtaskDate = date;
-
-    subtaskDateDisplay.textContent = date;
-
-    // サブタスクと実績を取得
-    try {
-        const response = await fetch(`/api/routines/${routineId}/subtasks/logs?date=${date}`);
-        if (!response.ok) throw new Error('Failed to fetch subtask logs');
-        const subtaskLogs = await response.json();
-
-        renderSubtaskCompletionList(subtaskLogs);
-
-        subtaskCompletionModal.style.display = 'flex';
-        setTimeout(() => subtaskCompletionModal.classList.add('active'), 10);
-    } catch (error) {
-        console.error('Error loading subtask completion:', error);
-    }
-}
-
-// サブタスク実績モーダルを閉じる
-function closeSubtaskCompletionModal() {
-    subtaskCompletionModal.classList.remove('active');
-    setTimeout(() => {
-        subtaskCompletionModal.style.display = 'none';
-        currentSubtaskRoutineId = null;
-        currentSubtaskDate = null;
-    }, 300);
-    // 完了状態を更新
-    fetchRoutines();
-}
-
-// サブタスク実績リストを描画
-function renderSubtaskCompletionList(subtaskLogs) {
-    subtaskCompletionList.innerHTML = '';
-
-    if (subtaskLogs.length === 0) {
-        subtaskCompletionList.innerHTML = '<li style="text-align: center; color: var(--text-muted); padding: 2rem;">No subtasks for this routine.</li>';
-        return;
-    }
-
-    subtaskLogs.forEach(log => {
-        const li = document.createElement('li');
-        li.className = 'subtask-completion-item';
-        if (log.completed) li.classList.add('completed');
-
-        const checkbox = document.createElement('div');
-        checkbox.className = 'subtask-checkbox';
-        checkbox.innerHTML = '<ion-icon name="checkmark-outline"></ion-icon>';
-
-        const title = document.createElement('span');
-        title.className = 'subtask-completion-title';
-        title.textContent = log.title;
-
-        li.appendChild(checkbox);
-        li.appendChild(title);
-        li.onclick = () => toggleSubtaskCompletion(log.id);
-
-        subtaskCompletionList.appendChild(li);
-    });
-}
-
-// サブタスク完了状態切り替え
-async function toggleSubtaskCompletion(subtaskId) {
-    try {
-        const response = await fetch(`/api/subtasks/${subtaskId}/toggle`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ date: currentSubtaskDate })
-        });
-
-        if (response.ok) {
-            // リストを再読み込み
-            const logsResponse = await fetch(`/api/routines/${currentSubtaskRoutineId}/subtasks/logs?date=${currentSubtaskDate}`);
-            const subtaskLogs = await logsResponse.json();
-            renderSubtaskCompletionList(subtaskLogs);
-        }
-    } catch (error) {
-        console.error('Error toggling subtask:', error);
-    }
-}
-
-// モーダル外クリックで閉じる（既存のwindow.onclickを上書き）
-window.onclick = (event) => {
-    if (event.target == modal) closeModal();
-    if (event.target == addModal) closeAddModal();
-    if (event.target == dailyTasksModal) closeDailyTasks();
-    if (event.target == subtaskModal) closeSubtaskModal();
-    if (event.target == subtaskCompletionModal) closeSubtaskCompletionModal();
-};
-
-// グローバルスコープ関数として公開（サブタスクモーダル用）
-window.closeSubtaskModal = closeSubtaskModal;
-window.closeSubtaskCompletionModal = closeSubtaskCompletionModal;
-
-
-// 初期ロード
-fetchRoutines();
