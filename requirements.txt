@@ -1,4 +1,4 @@
 flask
 flask-sqlalchemy
 gunicorn
-uvicorn==0.13
+uvicorn
