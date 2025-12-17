@@ -7,6 +7,8 @@
     <title>Weekly Routine Tracker</title>
     <!-- Google Fonts の読み込み -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- スタイルシート -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=9">
     <!-- Ionicons アイコンライブラリ -->
@@ -39,6 +41,9 @@
                 </button>
                 <button id="global-history-btn" class="icon-btn" title="Global History">
                     <ion-icon name="calendar-outline"></ion-icon> History
+                </button>
+                <button id="analytics-btn" class="icon-btn" title="Analytics" onclick="openAnalyticsModal()">
+                    <ion-icon name="stats-chart-outline"></ion-icon> Analyze
                 </button>
             </div>
 
@@ -178,6 +183,55 @@
                 <ul id="history-list" class="history-list">
                     <!-- History items will be inserted here -->
                 </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Modal -->
+    <div id="analytics-modal" class="modal">
+        <div class="modal-content large-modal">
+            <div class="modal-header">
+                <h2>分析ダッシュボード</h2>
+                <button class="close-btn" onclick="closeAnalyticsModal()">
+                    <ion-icon name="close-outline"></ion-icon>
+                </button>
+            </div>
+
+            <div class="analytics-container">
+                <!-- Summary Cards -->
+                <div class="stats-row">
+                    <div class="stat-card" title="直近30日間の全タスクに対する達成率です。">
+                        <h3>全体達成率 <ion-icon name="help-circle-outline"></ion-icon></h3>
+                        <div class="stat-value" id="total-rate-display">--%</div>
+                    </div>
+                    <div class="stat-card" title="現在、昨日または今日達成して継続が途切れていないルーチンの数です。">
+                        <h3>継続中のルーチン <ion-icon name="help-circle-outline"></ion-icon></h3>
+                        <div class="stat-value" id="active-streaks-display">--</div>
+                    </div>
+                </div>
+
+                <!-- Advice Section -->
+                <div class="advice-box" id="analytics-advice">
+                    データを読み込み中...
+                </div>
+
+                <!-- Charts Grid -->
+                <div class="charts-grid">
+                    <div class="chart-container" title="過去4週間の総達成タスク数です。">
+                        <div class="chart-header-row">
+                            <h3>週間達成推移</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="historyChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-container" title="曜日ごとの累積達成タスク数です。得意な曜日がわかります。">
+                        <h3>曜日別傾向</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="dayDistributionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

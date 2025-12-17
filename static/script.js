@@ -128,6 +128,14 @@ function renderRoutines(routines, weekDates) {
         textSpan.style.flex = 1;
         titleDiv.appendChild(textSpan);
 
+        // Streak Badge
+        if (routine.current_streak && routine.current_streak > 0) {
+            const badge = document.createElement('span');
+            badge.className = 'streak-badge';
+            badge.innerHTML = `<ion-icon name="flame"></ion-icon> ${routine.current_streak}`;
+            titleDiv.appendChild(badge);
+        }
+
         // Remove inline add button, it's now in the modal
 
         li.appendChild(titleDiv);
@@ -600,24 +608,138 @@ const encouragementMessages = [
     "よく頑張っています！👏"
 ];
 
-function openDailyTasks() {
-    const today = new Date();
-    const dayOfWeek = today.getDay(); // 0-6
-    const tYear = today.getFullYear();
-    const tMonth = String(today.getMonth() + 1).padStart(2, '0');
-    const tDay = String(today.getDate()).padStart(2, '0');
-    const todayStr = `${tYear}-${tMonth}-${tDay}`;
+// --- Analytics Dashboard Logic ---
 
-    // Filter routines for today
-    const todaysRoutines = globalRoutines.filter(r => {
-        const targetDays = r.target_days ? r.target_days.split(',') : "0,1,2,3,4,5,6".split(',');
-        return targetDays.includes(String(dayOfWeek));
+const analyticsModal = document.getElementById('analytics-modal');
+let historyChart = null;
+let dayChart = null;
+
+async function openAnalyticsModal() {
+    analyticsModal.style.display = 'flex';
+    setTimeout(() => analyticsModal.classList.add('active'), 10);
+
+    try {
+        const response = await fetch('/api/analytics/overall');
+        const data = await response.json();
+        cachedAnalyticsData = data; // Cache the data
+
+        document.getElementById('total-rate-display').textContent = data.total_completion_rate + '%';
+        document.getElementById('active-streaks-display').textContent = data.active_streaks;
+        document.getElementById('analytics-advice').textContent = data.advice;
+
+        renderAnalyticsCharts(data);
+    } catch (error) {
+        console.error('Error fetching analytics:', error);
+        document.getElementById('analytics-advice').textContent = "データの読み込みに失敗しました。";
+    }
+}
+
+function closeAnalyticsModal() {
+    analyticsModal.classList.remove('active');
+    setTimeout(() => analyticsModal.style.display = 'none', 300);
+}
+
+function renderAnalyticsCharts(data) {
+    // 1. Weekly History (Line Chart)
+    const ctxHistory = document.getElementById('historyChart').getContext('2d');
+
+    // Prepare Data (Weekly Only)
+    let labels = [], counts = [];
+    if (data.weekly_history && data.weekly_history.length > 0) {
+        labels = data.weekly_history.map(item => item.week);
+        counts = data.weekly_history.map(item => item.count);
+    } else {
+        // Fallback
+        labels = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+        counts = [0, 0, 0, 0];
+    }
+
+    if (historyChart) historyChart.destroy();
+
+    historyChart = new Chart(ctxHistory, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '完了タスク数',
+                data: counts,
+                borderColor: '#8b5cf6', // Violet
+                backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false, // Fits container (200px)
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { precision: 0 } },
+                x: { grid: { display: false } }
+            }
+        }
     });
 
-    // Check completion
-    // We need to check the logs for today.
-    // Since globalRoutines structure is: { ..., week_logs: [...] }
-    // We can check week_logs or use cachedHistoryData if available/fresh.
+    // 2. Day Distribution (Bar Chart)
+    const ctxDay = document.getElementById('dayDistributionChart').getContext('2d');
+
+    if (dayChart) dayChart.destroy();
+
+    const dayLabels = ['日', '月', '火', '水', '木', '金', '土'];
+
+    dayChart = new Chart(ctxDay, {
+        type: 'bar',
+        data: {
+            labels: dayLabels,
+            datasets: [{
+                label: '完了数',
+                data: data.day_distribution,
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.6)',
+                    'rgba(54, 162, 235, 0.6)',
+                    'rgba(255, 206, 86, 0.6)',
+                    'rgba(75, 192, 192, 0.6)',
+                    'rgba(153, 102, 255, 0.6)',
+                    'rgba(255, 159, 64, 0.6)',
+                    'rgba(255, 99, 132, 0.6)'
+                ],
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false, // Fits container (200px)
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { precision: 0 } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+}
+
+const today = new Date();
+const dayOfWeek = today.getDay(); // 0-6
+const tYear = today.getFullYear();
+const tMonth = String(today.getMonth() + 1).padStart(2, '0');
+const tDay = String(today.getDate()).padStart(2, '0');
+const todayStr = `${tYear}-${tMonth}-${tDay}`;
+
+// Filter routines for today
+const todaysRoutines = globalRoutines.filter(r => {
+    const targetDays = r.target_days ? r.target_days.split(',') : "0,1,2,3,4,5,6".split(',');
+    return targetDays.includes(String(dayOfWeek));
+});
+
+// Check completion
+// We need to check the logs for today.
+// Since globalRoutines structure is: { ..., week_logs: [...] }
+// We can check week_logs or use cachedHistoryData if available/fresh.
+function openDailyTasks() {
     // Relying on week_logs from globalRoutines is safer as it's from fetchRoutines.
 
     dailyTaskList.innerHTML = '';
@@ -714,6 +836,40 @@ const modalWeekHeader = document.getElementById('modal-week-header');
 
 let currentDetailRoutineId = null;
 
+async function renderRoutineStats(routineId) {
+    try {
+        const response = await fetch(`/api/analytics/routine/${routineId}`);
+        const data = await response.json();
+
+        // Find or create stats container in modal
+        let statsContainer = document.getElementById('modal-routine-stats');
+        if (!statsContainer) {
+            statsContainer = document.createElement('div');
+            statsContainer.id = 'modal-routine-stats';
+            statsContainer.className = 'modal-stats-container';
+            // Insert after title
+            detailModalTitle.parentNode.insertBefore(statsContainer, detailModalTitle.nextSibling);
+        }
+
+        statsContainer.innerHTML = `
+            <div class="mini-stat">
+                <span class="label">Streak</span>
+                <span class="value">🔥 ${data.current_streak}</span>
+            </div>
+            <div class="mini-stat">
+                <span class="label">Rate</span>
+                <span class="value">${data.completion_rate}%</span>
+            </div>
+            <div class="mini-graph">
+                <!-- Simple bar graph -->
+                ${data.weekly_trend.map(val => `<div class="bar" style="height:${val * 14}px; title="${val}"></div>`).join('')}
+            </div>
+        `;
+    } catch (error) {
+        console.error("Failed to load routine stats", error);
+    }
+}
+
 async function openTaskDetailModal(routineId) {
     currentDetailRoutineId = routineId;
     const routine = globalRoutines.find(r => r.id === routineId);
@@ -721,6 +877,9 @@ async function openTaskDetailModal(routineId) {
 
     detailModalTitle.textContent = routine.title;
     detailModalTitle.onclick = () => editRoutineNameInModal(routine.id, routine.title);
+
+    // Fetch and render Stats
+    renderRoutineStats(routine.id);
 
     // Render Subtasks
     renderModalSubtasks(routine);
